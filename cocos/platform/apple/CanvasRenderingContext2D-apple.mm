@@ -546,19 +546,33 @@ void CanvasGradient::addColorStop(float offset, const std::string& color)
 
 namespace
 {
-#define CLAMP(V, HI) std::min( (V), (HI) )
+#define UNPREMULQ(x) (0xFF00FFU / (x))
+#define UNPREMULQ_2(x) UNPREMULQ(x), UNPREMULQ((x) + 1)
+#define UNPREMULQ_4(x) UNPREMULQ_2(x), UNPREMULQ_2((x) + 2)
+#define UNPREMULQ_8(x) UNPREMULQ_4(x), UNPREMULQ_4((x) + 4)
+#define UNPREMULQ_16(x) UNPREMULQ_8(x), UNPREMULQ_8((x) + 8)
+#define UNPREMULQ_32(x) UNPREMULQ_16(x), UNPREMULQ_16((x) + 16)
+    const uint32_t sUnpremultiplyTable[256] = {0,
+                                                  UNPREMULQ(1),
+                                                  UNPREMULQ_2(2),
+                                                  UNPREMULQ_4(4),
+                                                  UNPREMULQ_8(8),
+                                                  UNPREMULQ_16(16),
+                                                  UNPREMULQ_32(32),
+                                                  UNPREMULQ_32(64),
+                                                  UNPREMULQ_32(96),
+                                                  UNPREMULQ_32(128),
+                                                  UNPREMULQ_32(160),
+                                                  UNPREMULQ_32(192),
+                                                  UNPREMULQ_32(224)};
     void unMultiplyAlpha(unsigned char* ptr, ssize_t size)
     {
-        float alpha;
         for (int i = 0; i < size; i += 4)
         {
-            alpha = (float)ptr[i + 3];
-            if (alpha > 0)
-            {
-                ptr[i] = CLAMP((int)((float)ptr[i] / alpha * 255), 255);
-                ptr[i+1] = CLAMP((int)((float)ptr[i+1] / alpha * 255), 255);
-                ptr[i+2] =  CLAMP((int)((float)ptr[i+2] / alpha * 255), 255);
-            }
+            uint32_t q = sUnpremultiplyTable[ptr[i + 3]];
+            ptr[i] = (ptr[i] * q) >> 16;
+            ptr[i+1] = (ptr[i+1] * q) >> 16;
+            ptr[i+2] = (ptr[i+2] * q) >> 16;
         }
     }
 }
